@@ -1,0 +1,19 @@
+{
+  "name": "A股每日低估值选股与交易计划",
+  "execution_environment": "codex_cloud",
+  "timezone": "Asia/Shanghai",
+  "start_time": "08:30",
+  "cadence": "daily",
+  "independent_runs": true,
+  "model": "account_default",
+  "data_policy": "public_verified_sources",
+  "notification": "feishu_summary_only",
+  "repository_name": "ashare-daily-research",
+  "repository_visibility": "public",
+  "repository_url": "https://github.com/i-meteor-shower/ashare-daily-research",
+  "feishu_secret_name": "FEISHU_WEBHOOK_URL",
+  "native_schedule_id": null,
+  "published_environment_id": null,
+  "status": "prepared_not_scheduled",
+  "enable_only_after_cloud_smoke_test": true
+}
