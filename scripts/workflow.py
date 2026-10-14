@@ -175,7 +175,7 @@ def validate(result):
             raise ValueError("risk/reward at the least favorable entry must be at least 2:1")
         if number(stock["atr14"], "ATR14") <= 0:
             raise ValueError("ATR14 must be calculated")
-        if int(stock["volume_sample_count"]) != 20:
+        if number(stock["volume_sample_count"], "volume_sample_count") != 20:
             raise ValueError("liquidity must use twenty trading days")
         threshold = number(result.get("liquidity_threshold", 100000000), "liquidity threshold")
         if threshold != 100000000:
@@ -302,7 +302,7 @@ def archive(root, result, markdown):
                       stock["stop"] if buying else "",
                       "—".join(map(str, stock["first_target_range"])) if buying else "",
                       stock.get("value_base", ""), stock.get("pattern", "待确认"), score(stock),
-                      stock.get("risk", "待核验"), "|".join(stock["source_ids"]),
+                      stock.get("risk", "待核验"), "|".join(s["url"] for s in result["sources"] if s["id"] in stock["source_ids"]),
                       result.get("baseline_date", ""), version]
             rows.append(dict(zip(HEADERS, values)))
         buffer = io.StringIO(newline="")
