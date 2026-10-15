@@ -8,6 +8,7 @@
 | --- | --- |
 | research_date | 北京时间YYYY-MM-DD |
 | generated_at | 含时区ISO时间，转换北京日期后与研究日期一致 |
+| run_mode | 默认scheduled；盘后手动验收可用manual_acceptance |
 | baseline_date | 最近完整交易日YYYY-MM-DD；无法核验则null |
 | status | complete / partial / insufficient / holiday |
 | is_trade_day | true / false / null；未知用null |
@@ -17,6 +18,8 @@
 | issues | 缺失/异常列表；partial及insufficient必须非空 |
 | sources | 来源清单：id、kind、url、data_date、collected_at |
 | candidates | 最多五只；holiday/insufficient必须空列表 |
+
+正式scheduled运行的baseline_date必须早于研究日，不能用当日未收盘行情。manual_acceptance必须在北京时间15:30后，提供包含“盘后云端验收，非今日盘前计划”的manual_acceptance_note，归档报告和摘要必须保留该标签。同日基准还需baseline_close_verified=true、已核验交易日历及同日quote来源；这些标记不能代替实际来源核验。盘后验收存在候选时，plan_trade_date必须是研究日之后的已核验交易日，并标plan_trade_date_verified=true。任何模式均禁止未来基准日期。
 
 来源kind包括calendar、quote、formal_report、forecast、analyst_estimate、announcement、news等。正式财报的data_date为报告期，公开日期及采集证据另存evidence。报价来源data_date必须为baseline_date。所有collected_at须有时区且不晚于generated_at。
 
