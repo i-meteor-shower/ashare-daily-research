@@ -53,6 +53,17 @@ def report(study="2026-10-15"):
         "## " + h for h in ["市场概览", "今日候选股票排行榜", "单只股票深度分析", "今日操作优先级", "数据来源"])
 
 
+def after_close_sample():
+    result = sample()
+    result.update(run_mode="manual_acceptance", generated_at="2026-10-15T20:40:00+08:00",
+                  baseline_date="2026-10-15", baseline_close_verified=True,
+                  manual_acceptance_note="盘后云端验收，非今日盘前计划",
+                  plan_trade_date="2026-10-16", plan_trade_date_verified=True)
+    result["sources"][1].update(data_date="2026-10-15", collected_at="2026-10-15T20:39:00+08:00")
+    result["candidates"][0]["quote_date"] = "2026-10-15"
+    return result
+
+
 class ValidationTests(unittest.TestCase):
     def test_accept_structurally_complete_candidate(self):
         w.validate(sample())
@@ -64,6 +75,33 @@ class ValidationTests(unittest.TestCase):
             modify(result)
             with self.assertRaises(ValueError):
                 w.validate(result)
+
+    def test_accept_explicit_after_close_sample_with_future_plan(self):
+        result = after_close_sample()
+        w.validate(result)
+        summary = w.summary(result, "reports/test.md")
+        self.assertIn("盘后云端验收，非今日盘前计划", summary)
+        self.assertIn("条件计划适用交易日：2026-10-16", summary)
+        self.assertNotIn("盘前条件计划", summary)
+
+    def test_reject_unsafe_after_close_acceptance(self):
+        changes = [
+            {"run_mode": "scheduled"}, {"run_mode": "unknown"},
+            {"generated_at": "2026-10-15T15:29:00+08:00"},
+            {"baseline_close_verified": False}, {"calendar_verified": False},
+            {"is_trade_day": False}, {"manual_acceptance_note": ""},
+            {"plan_trade_date": "2026-10-15"}, {"plan_trade_date_verified": False},
+            {"baseline_date": "2026-10-16"}]
+        for change in changes:
+            with self.subTest(change=change):
+                result = after_close_sample()
+                result.update(change)
+                with self.assertRaises(ValueError):
+                    w.validate(result)
+        result = after_close_sample()
+        result["sources"][1]["data_date"] = "2026-10-14"
+        with self.assertRaises(ValueError):
+            w.validate(result)
 
     def test_reject_unsupported_security_and_st(self):
         for change in ({"code": "300001"}, {"code": "688001"}, {"name": "*ST测试"}, {"board_verified": False}):
@@ -120,6 +158,15 @@ class ValidationTests(unittest.TestCase):
 
 
 class ArchiveTests(unittest.TestCase):
+    def test_after_close_report_must_include_disclosure(self):
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as directory:
+            root = Path(directory)
+            result = after_close_sample()
+            with self.assertRaises(ValueError):
+                w.archive(root, result, report())
+            run = w.archive(root, result, report() + "\n盘后云端验收，非今日盘前计划\n")
+            self.assertIn("盘后云端验收，非今日盘前计划", (run / "summary.txt").read_text(encoding="utf-8"))
+
     def test_same_version_is_idempotent_and_new_version_keeps_original(self):
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as directory:
             root = Path(directory)
