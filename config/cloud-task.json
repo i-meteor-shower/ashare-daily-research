@@ -16,7 +16,19 @@
   "native_schedule_url": "https://chatgpt.com/scheduled?automationId=6ad0c5a545208190b13960f569bc9213&automationSource=cloud",
   "published_environment_id": null,
   "published_environment_required": false,
-  "status": "created_paused_pending_cloud_test",
-  "cloud_test_status": "run_now_requested_result_not_yet_observed",
+  "status": "created_paused_cloud_test_incomplete",
+  "cloud_test_status": "repository_persistence_passed_research_and_delivery_incomplete",
+  "cloud_test_conversation_url": "https://chatgpt.com/c/6ad0c66e-619c-83ea-8735-d206049cbb3d",
+  "cloud_test_report": "reports/2026-10-15.v2-2034.md",
+  "cloud_test": {
+    "repository_read": "passed",
+    "repository_write": "passed_on_second_attempt",
+    "market_data": "partial_indices_only",
+    "stock_coverage_count": 0,
+    "feishu_send": "not_attempted_no_external_https_post_tool",
+    "feishu_business_success": false,
+    "delivery_state": "prepared",
+    "local_unit_tests": 18
+  },
   "enable_only_after_cloud_smoke_test": true
 }
