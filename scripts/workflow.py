@@ -62,6 +62,16 @@ def validate(result):
     generated = datetime.fromisoformat(result["generated_at"])
     if generated.tzinfo is None or generated.astimezone(BEIJING).date() != study:
         raise ValueError("generated_at must be timezone-aware and match the Beijing research date")
+    run_mode = result.get("run_mode", "scheduled")
+    if run_mode not in {"scheduled", "manual_acceptance"}:
+        raise ValueError("invalid run_mode")
+    if run_mode == "manual_acceptance":
+        note = text_required(result.get("manual_acceptance_note"), "manual_acceptance_note")
+        if "盘后云端验收，非今日盘前计划" not in note:
+            raise ValueError("manual acceptance must be explicitly labeled as an after-close test")
+        local = generated.astimezone(BEIJING)
+        if (local.hour, local.minute) < (15, 30):
+            raise ValueError("after-close manual acceptance requires Beijing time at or after 15:30")
     status = result["status"]
     if status not in {"complete", "partial", "insufficient", "holiday"}:
         raise ValueError("invalid research status")
@@ -74,8 +84,13 @@ def validate(result):
     if status in {"complete", "partial"} and (trade_day is not True or not calendar_verified):
         raise ValueError("research requires a verified trading day")
     base = result.get("baseline_date")
-    if base and date.fromisoformat(base) >= study:
-        raise ValueError("baseline must be a fully closed trading day before research date")
+    if base:
+        baseline = date.fromisoformat(base)
+        if baseline > study or (baseline == study and run_mode != "manual_acceptance"):
+            raise ValueError("scheduled baseline must precede research date; future baselines are forbidden")
+        if baseline == study and (result.get("baseline_close_verified") is not True
+                                  or trade_day is not True or not calendar_verified):
+            raise ValueError("same-day acceptance requires a verified trading day and completed close")
     if status in {"complete", "partial"} and not base:
         raise ValueError("baseline_date is required")
     if result["strategy"] not in {"偏进攻", "均衡", "偏防守", "观望", "休市"}:
@@ -107,11 +122,18 @@ def validate(result):
         text_required(source["kind"], "source.kind")
     if calendar_verified and not any(s.get("kind") == "calendar" for s in sources):
         raise ValueError("verified calendar requires a calendar source")
+    if base == result["research_date"] and not any(
+            s.get("kind") == "quote" and s["data_date"] == base for s in sources):
+        raise ValueError("same-day close requires a baseline quote source")
     candidates = result.get("candidates", [])
     if not isinstance(candidates, list) or len(candidates) > 5:
         raise ValueError("at most five candidates are allowed")
     if status in {"holiday", "insufficient"} and candidates:
         raise ValueError("holiday/insufficient runs cannot contain recommendations")
+    if run_mode == "manual_acceptance" and candidates:
+        plan_day = date.fromisoformat(result.get("plan_trade_date", ""))
+        if plan_day <= study or result.get("plan_trade_date_verified") is not True:
+            raise ValueError("after-close plans require a verified future trading date")
     seen = set()
     for stock in candidates:
         code = stock["code"]
@@ -227,6 +249,11 @@ def summary(result, report_relative):
              f"行情基准日：{result.get('baseline_date') or '未验证'}",
              f"策略：{result['strategy']}｜数据状态：{result['status']}",
              "覆盖：" + result["coverage"]]
+    manual = result.get("run_mode") == "manual_acceptance"
+    if manual:
+        lines.append(result["manual_acceptance_note"])
+        if result.get("plan_trade_date"):
+            lines.append("条件计划适用交易日：" + result["plan_trade_date"])
     if result["status"] == "holiday":
         lines.append("今日休市，不重复推送旧推荐。")
     elif result["status"] == "insufficient":
@@ -246,7 +273,8 @@ def summary(result, report_relative):
             lines.append("观察池（无可执行买点）：" + "、".join(s["code"] + " " + s["name"] for s in watching))
     if result.get("issues"):
         lines.append("数据问题：" + "；".join(result["issues"]))
-    lines.extend(["盘前条件计划，需盘中确认；止损不保证按参考价成交。",
+    lines.extend([("盘后验收条件计划，仅面向已核验的后续交易日，需盘中确认；止损不保证按参考价成交。"
+                   if manual else "盘前条件计划，需盘中确认；止损不保证按参考价成交。"),
                   "完整报告：" + REPO + "/blob/main/" + report_relative])
     return "\n".join(lines)
 
@@ -259,6 +287,8 @@ def archive(root, result, markdown):
                 raise ValueError("report section missing: " + heading)
     if result["research_date"] not in markdown:
         raise ValueError("report must identify its research date")
+    if result.get("run_mode") == "manual_acceptance" and "盘后云端验收，非今日盘前计划" not in markdown:
+        raise ValueError("manual report must disclose that it is an after-close acceptance test")
     if "/bot/v2/hook/" in markdown or "/bot/v2/hook/" in json_text(result):
         raise ValueError("do not archive webhook credentials")
     version = hashlib.sha256((json_text(result) + markdown).encode("utf-8")).hexdigest()[:16]
